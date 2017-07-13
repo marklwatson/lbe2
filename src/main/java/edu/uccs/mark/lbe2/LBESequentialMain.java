@@ -16,7 +16,7 @@ public class LBESequentialMain {
     //arrays of lattice weights and direction components
     public static final double wi[] = new double[]{ w0, ws, ws, ws, ws, wd, wd, wd, wd};
     public static final int dirx[] = new int[]{ 0,  1,  0,   -1,  0,  1,  -1, -1,  1};
-    public static final int diry[] = new int[]{ 0,  0,  1,    0, -1,  1,   1, -1,  1};
+    public static final int diry[] = new int[]{ 0,  0,  1,    0, -1,  1,   1, -1,  -1};
 
     //viscosity
     public static final double nu = 1.0/6.0;
@@ -46,8 +46,8 @@ public class LBESequentialMain {
         //and the entire grid state (rho, and u) are in State
 
         //allocate variables
-        Distribution[][] f1 = null;
-        Distribution[][] f2 = null;
+        Distribution[][] f1 = createDistributionGrid();
+        Distribution[][] f2 = createDistributionGrid();
         Distribution[][] temp = null;
 
         State[][] state = new State[NX][NY];
@@ -57,8 +57,9 @@ public class LBESequentialMain {
         taylorGreen(0, state);
 
         //initialize f1 as equilibrium for rho, ux, and uy
-        f1 = initEqulibrium(state);
-        f2 = initEqulibrium(state);
+        f1 = initEqulibrium(f1, state);
+
+        printState(state);
 
         //run the simulation loop;  take NSTEPS time steps
         for(int n = 0; n < NSTEPS; n++){
@@ -76,6 +77,19 @@ public class LBESequentialMain {
             f1 = f2;
             f2 = temp;
         }
+
+        System.out.println();System.out.println();
+        printState(state);
+    }
+
+    private static Distribution[][] createDistributionGrid(){
+        Distribution[][] dist = new Distribution[NX][NY];
+        for(int x = 0; x < NX; x++) {
+            for (int y = 0; y < NY; y++) {
+                dist[x][y] = new Distribution();
+            }
+        }
+        return dist;
     }
 
     private static void taylorGreen(int t, State[][] state){
@@ -104,16 +118,14 @@ public class LBESequentialMain {
         state.rho = rho0+3.0*P;
     }
 
-    private static Distribution[][] initEqulibrium(State[][] state){
-        Distribution[][] distGrid = new Distribution[NX][NY];
+    private static Distribution[][] initEqulibrium(Distribution[][] distGrid, State[][] state){
         for(int x = 0; x < NX; x++) {
             for (int y = 0; y < NY; y++) {
+                Distribution dist =distGrid[x][y];
                 State s = state[x][y];
                 for(int i = 0; i < ndir; i++){
                     double cidotu = dirx[i]*s.ux + diry[i]*s.uy;
-                    Distribution dist = new Distribution();
                     dist.f[i] = wi[i]*s.rho*(1.0 + 3.0*cidotu + 4.5*cidotu*cidotu - 1.5*(s.ux*s.ux+s.uy*s.uy));
-                    distGrid[x][y] = dist;
                 }
             }
         }
@@ -124,9 +136,15 @@ public class LBESequentialMain {
         for(int x = 0; x < NX; x++) {
             for (int y = 0; y < NY; y++) {
                 for (int i = 0; i < ndir; i++) {
-                    int xmd = (NX+x-dirx[i]) % NX;
-                    int ymd = (NY+y-diry[i]) & NY;
-                    fDest[x][y].f[i] = fSrc[xmd-1][ymd-1].f[i];
+                    //int xmd = (NX+x-dirx[i]) % NX;
+                    //int ymd = (NY+y-diry[i]) & NY;
+                    int xmd = x + dirx[i];
+                    int ymd = y + diry[i];
+                    xmd = (xmd==NX)?0:xmd;
+                    ymd = (ymd==NY)?0:ymd;
+                    xmd = (xmd==-1)?NX-1:xmd;
+                    ymd = (ymd==-1)?NY-1:ymd;
+                    fDest[x][y].f[i] = fSrc[xmd][ymd].f[i];
                 }
             }
         }
@@ -168,6 +186,15 @@ public class LBESequentialMain {
                     d.f[i] = omtauinv*d.f[i]+tauinv*feq;
                 }
             }
+        }
+    }
+
+    public static void printState(State[][] state){
+        for(int y = NY -1; y >=0; y--){
+            for(int x = 0; x < NX; x++){
+                System.out.print(state[x][y].rho + " ");
+            }
+            System.out.println();
         }
     }
 
